@@ -5,6 +5,10 @@
     Licensed under the MIT License. See LICENSE.
      
     Changelog:
+    v0.2.2 (10/03/2016)
+        * Minor formatting improvements
+        * Use ifcmd macro for more readable parameter parsing code
+        * Improve Makefile a bit
     v0.2.1 (08/10/2016)
         * Fixed --list-only, -l printing something that should have been omitted
         * Contradictory parameters now result in a warning
@@ -44,21 +48,21 @@
 
 typedef struct file
 {
-    char* name;
+    char*  name;
     size_t size;
     struct file* next;
 } file_t;
 
 typedef enum
 {
-    MATCH_NONE=-1,
-    MATCH_ALL=0,
-    MATCH_NAME_ONLY=1
+    MATCH_NONE       = -1,
+    MATCH_ALL        =  0,
+    MATCH_NAME_ONLY  =  1
 } match_t;
 
 
 file_t* snapshot = NULL;
-file_t* changed = NULL;
+file_t* changed  = NULL;
 DIR* log_dir;
 
 
@@ -66,9 +70,9 @@ DIR* log_dir;
 int auto_mode = 0,
     list_only = 0;
 
-int seconds = 2;
+int seconds        = 2;
 char* log_dir_path = NULL;
-char* command = NULL;
+char* command      = NULL;
 
 char HELP[] = 
 "\
@@ -199,14 +203,13 @@ int main(int argc,char** argv)
         int i;
         for (i = 1;i < argc;i++)
         {
+            #define ifcmd(lname,sname) if (strcmp(argv[i],lname) == 0 || strcmp(argv[i],sname) == 0)
         
-            #define ifcmd(sname,lname) if (strcmp(argv[i],sname) == 0 || strcmp(argv[i],lname == 0))
-            
-            if (strcmp(argv[i],"--auto") == 0 || strcmp(argv[i],"-a") == 0)
+            ifcmd("--auto","-a")
             {
                 auto_mode = 1;
             }
-            else if (strcmp(argv[i],"--command") == 0 || strcmp(argv[i],"-c") == 0)
+            else ifcmd("--command","-c")
             {
                 if (argc == i+1) 
                 {
@@ -218,7 +221,7 @@ int main(int argc,char** argv)
                 if (list_only)
                     fprintf(stderr,"Warning: --command (-c) and --list-only (-l) contradict each other\n");    
             }
-            else if (strcmp(argv[i],"--directory") == 0 || strcmp(argv[i],"-d") == 0)
+            else ifcmd("--directory","-d")
             {
                 if (argc == i+1) 
                 {
@@ -227,18 +230,18 @@ int main(int argc,char** argv)
                 }
                 tmp_dir = argv[++i];
             }
-            else if (strcmp(argv[i],"--help") == 0 || strcmp(argv[i],"-h") == 0)
+            else ifcmd("--help","-h")
             {
                 printf(HELP,argv[0],argv[0]);
                 return 0;
             }
-            else if (strcmp(argv[i],"--list") == 0 || strcmp(argv[i],"-l") == 0)
+            else ifcmd("--list","-l")
             {
                 list_only = 1;
                 if (command != NULL)
                     fprintf(stderr,"Warning: --command (-c) and --list-only (-l) contradict each other\n"); 
             }
-            else if (strcmp(argv[i],"--wait") == 0 || strcmp(argv[i],"-w") == 0)
+            else ifcmd("--wait","-w")
             {
                 if (argc == i+1) 
                 {
