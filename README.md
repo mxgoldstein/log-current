@@ -34,7 +34,7 @@ make uninstall # Uninstall log-current
 ```
 TODO
 ----
-* Add recrusive log searching
+* Add recursive log searching
 * Add file extension filter
 * Replace tailf with own implementation
 
