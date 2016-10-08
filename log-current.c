@@ -5,10 +5,16 @@
     Licensed under the MIT License. See LICENSE.
      
     Changelog:
+    v0.2.3 (10/08/2016)
+        * Now checks whether interactive input is valid or not
+        * Now ignores directories (as it should)
+        * --wait no longer ignores invalid durations
+        * Tidied up usage
+        * Removed redundant code
     v0.2.2 (10/03/2016)
         * Minor formatting improvements
-        * Use ifcmd macro for more readable parameter parsing code
-        * Improve Makefile a bit
+        * Used ifcmd macro for more readable parameter parsing code
+        * Improved Makefile a bit
     v0.2.1 (08/10/2016)
         * Fixed --list-only, -l printing something that should have been omitted
         * Contradictory parameters now result in a warning
@@ -18,7 +24,7 @@
         * Added --command, -c option
         * Added --list-only, -l option
         * Optimized memory allocation
-        * Error messages are now use stderr
+        * Error messages use stderr now
         * Fixed segmention fault if non-existent directory was specified
     v0.1.0 (07/10/2016)
         * Initial release
@@ -30,7 +36,9 @@
 
 #include <time.h>
 
+#include <errno.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -70,18 +78,18 @@ DIR* log_dir;
 int auto_mode = 0,
     list_only = 0;
 
-int seconds        = 2;
+long  seconds        = 2;
 char* log_dir_path = NULL;
 char* command      = NULL;
 
 char HELP[] = 
 "\
 Usage:\n%s [options]\n\n\
---auto, -a - Automatically select the first log file and ignore all others\n\
---command, -c <command> - Command to be applied to selected log file\n\
+--auto, -a                  - Automatically select the first log file and ignore all others\n\
+--command, -c <command>     - Command to be applied to selected log file\n\
 --directory, -d <directory> - Set directory to observe\n\
---list, -l - Only list files\n\
---wait, -w <delay> - Wait a specified amount of seconds\n\
+--list, -l                  - Only list files\n\
+--wait, -w <delay>          - Wait a specified amount of seconds\n\
 ";
 
 /* Add a file to the list */
@@ -178,10 +186,6 @@ size_t file_size(const char* name)
         fprintf(stderr,"Failed to open %s for reading\nTry running log-current as super user\n",name);
         free(filename);
         free(command);
-        free(log_dir_path);
-        closedir(log_dir);
-        file_cleanup(snapshot);
-        file_cleanup(changed);
         exit(1);
     }
     /* Seek end of file and return offset from beginnig */
@@ -192,12 +196,34 @@ size_t file_size(const char* name)
     return size;
 }
 
+int is_file(const char* directory,const char* filename)
+{
+    char* path;
+    struct stat st;
+
+    path = malloc(strlen(directory)+strlen(filename)+1);
+    sprintf(path,"%s%s",directory,filename);
+    stat(path,&st);
+    return S_ISREG(st.st_mode);
+}
+
+void cleanup()
+{
+    /* Clean up */
+    free(log_dir_path);
+    free(command);
+    closedir(log_dir);
+    file_cleanup(snapshot);
+    file_cleanup(changed);
+}
+
 int main(int argc,char** argv)
 {
     const char* tmp_dir = DEFAULT_LOG_DIR;
     struct dirent* ent;
     time_t t;
 
+    atexit(cleanup);
     if (argc != 1)
     {
         int i;
@@ -243,12 +269,19 @@ int main(int argc,char** argv)
             }
             else ifcmd("--wait","-w")
             {
+                char* end = NULL;
+                
                 if (argc == i+1) 
                 {
                     fprintf(stderr,"Too few arguments given\n");
                     break;
                 }
-                seconds = atoi(argv[++i]);
+                seconds = strtol(argv[++i],&end,10);
+                if (argv[i] == end || *end != '\0')
+                {
+                    fprintf(stderr,"'%s' is not a valid duration\n",argv[i]);
+                    break;
+                }
             }
             else 
             {
@@ -258,7 +291,6 @@ int main(int argc,char** argv)
         }
         if (i != argc)
         {
-            fprintf(stderr,"%s: Invalid arguments given\n",argv[0]);
             fprintf(stderr,HELP,argv[0],argv[0]);
             return 1;
         }
@@ -284,17 +316,18 @@ int main(int argc,char** argv)
         return 1;
     }
 
-    /* Create a snapshot of the directory state... */
+    /* Create a snapshot of the directory... */
     while ((ent = readdir(log_dir)))
     {
         if (strncmp(ent->d_name,".",1) == 0) continue; /* Ignore hidden files, . and .. */
+        if (!is_file(log_dir_path,ent->d_name)) continue; /* Ignore directories, devices etc. */
         file_add(&snapshot,ent->d_name,file_size(ent->d_name)); /* Append file to snapshot */
     }
 
     
-    /* This code works of the assumption that time_t is measured in seconds, this may not always be true */
+    /* This code is baded on the assumption that time_t is measured in seconds, this may not always be the case */
     t = time(NULL);
-    if (!list_only) printf("Waiting %d second%s...\n",seconds,seconds==1?"":"s");
+    if (!list_only) printf("Waiting %ld second%s...\n",seconds,seconds==1?"":"s");
     while (time(NULL) - t < seconds);
 
     /* Rewind directory */
@@ -304,6 +337,7 @@ int main(int argc,char** argv)
     while ((ent = readdir(log_dir)))
     {
         if (strncmp(ent->d_name,".",1) == 0) continue; /* Ignore hidden files, . and .. */
+        if (!is_file(log_dir_path,ent->d_name)) continue; /* Ignore directories, devices etc. */
         if (file_match(snapshot,ent->d_name,file_size(ent->d_name)) != MATCH_ALL)
         {
             file_add(&changed,ent->d_name,file_size(ent->d_name)); /* Append file to changed */
@@ -314,7 +348,7 @@ int main(int argc,char** argv)
     if (changed)
     {
         file_t* f;
-        int i,input;
+        long i,input;
     
         /* Print currently active log files */    
         i=0;
@@ -324,7 +358,7 @@ int main(int argc,char** argv)
             if (list_only || auto_mode)
                printf("%s\n",f->name);
             else
-                printf("%d: %s\n",i++,f->name);
+                printf("%ld: %s\n",i++,f->name);
             if (auto_mode) break;
         }
         
@@ -333,21 +367,39 @@ int main(int argc,char** argv)
         {
             if (!auto_mode)
             {
+                char s_input[256];
+                char* end;
                 /* Let user pick between them */
-                printf("%d: Exit\n",i);
-                printf("[0-%d]: ",i);
-                scanf("%d",&input);
+                printf("%ld: Quit\n",i);
+                input = -1;
+                
+                for (;;)
+                {
+                    printf("[0-%ld]: ",i);
+                    scanf("%s",s_input);
+                    input = strtol(s_input,&end,10);
+                    if (argv[i] == end || errno == ERANGE || *end != '\0')
+                    {
+                        fprintf(stderr,"'%s': Invalid input\n",s_input);
+                        continue;
+                    }
+                    if (input < 0 || input > i)
+                    {
+                        fprintf(stderr,"%ld: Out of range\n",input);
+                        continue;
+                    }
+                    break;
+                }
             } 
             else input = 0;
             
-            /* If input > i, do nothing (^= exit) */
-            if (input < i || auto_mode)
+            if (input != i)
             {
                 char* cmd;
                 i = 0;
             
                 /* Skip to currently selected log file */
-                for (f = changed;i != input;f = f->next);
+                for (f = changed;i != input;f = f->next) i++;
             
                 /* Run command log_dir_path/logfile */
                 cmd = malloc(strlen(command)+1+strlen(log_dir_path)+strlen(f->name)+1);
@@ -362,11 +414,5 @@ int main(int argc,char** argv)
         if (!list_only) printf("No log files are currently active.\n");
     }
 
-    /* Clean up */
-    free(log_dir_path);
-    free(command);
-    closedir(log_dir);
-    file_cleanup(snapshot);
-    file_cleanup(changed);
     return 0;
 }
