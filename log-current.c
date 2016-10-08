@@ -5,6 +5,8 @@
     Licensed under the MIT License. See LICENSE.
      
     Changelog:
+    v0.3.1 (10/09/2016)
+        * Misc. improvements
     v0.3.0 (10/09/2016)
         * Added --prefix, -p option 
         * Added --suffix, -s option
@@ -81,7 +83,7 @@ DIR* log_dir;
 int auto_mode = 0,
     list_only = 0;
 
-long  seconds        = 2;
+long  seconds      = 2;
 char* log_dir_path = NULL;
 char* command      = NULL;
 
@@ -392,6 +394,7 @@ int main(int argc,char** argv)
         if (file_match(snapshot,ent->d_name,file_size(ent->d_name)) != MATCH_ALL)
         {
             file_add(&changed,ent->d_name,file_size(ent->d_name)); /* Append file to changed */
+            if (auto_mode) break; /* If we're in auto mode, one match is enough */
         }
     }
 
@@ -465,5 +468,6 @@ int main(int argc,char** argv)
         if (!list_only) printf("No log files are currently active.\n");
     }
 
+    cleanup();
     return 0;
 }
