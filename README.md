@@ -13,13 +13,15 @@ Requirements
 Usage
 -----
 ```
-log-current [options]
+./log-current [options]
 
---auto, -a - Automatically select the first log file and ignore all others
---command, -c <command> - Command to be applied to selected log file
+--auto, -a                  - Automatically select the first log file and ignore all others
+--command, -c <command>     - Command to be applied to selected log file
 --directory, -d <directory> - Set directory to observe
---list, -l - Only list files
---wait, -w <delay> - Wait a specified amount of seconds
+--list, -l                  - Only list files
+--prefix, -p <suffix>       - filter by prefix
+--suffix, -s <prefix>       - filter by suffix
+--wait, -w <delay>          - Wait a specified amount of seconds
 ```
 
 Building
@@ -35,8 +37,6 @@ make uninstall # Uninstall log-current
 TODO
 ----
 * Add recursive log searching
-* Add file extension filter
-* Replace tailf with own implementation
 
 License
 -------

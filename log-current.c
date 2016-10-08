@@ -5,6 +5,9 @@
     Licensed under the MIT License. See LICENSE.
      
     Changelog:
+    v0.3.0 (10/09/2016)
+        * Added --prefix, -p option 
+        * Added --suffix, -s option
     v0.2.3 (10/08/2016)
         * Now checks whether interactive input is valid or not
         * Now ignores directories (as it should)
@@ -82,6 +85,9 @@ long  seconds        = 2;
 char* log_dir_path = NULL;
 char* command      = NULL;
 
+char* prefix       = NULL;
+char* suffix       = NULL;
+
 char HELP[] = 
 "\
 Usage:\n%s [options]\n\n\
@@ -89,6 +95,8 @@ Usage:\n%s [options]\n\n\
 --command, -c <command>     - Command to be applied to selected log file\n\
 --directory, -d <directory> - Set directory to observe\n\
 --list, -l                  - Only list files\n\
+--prefix, -p <suffix>       - filter by prefix\n\
+--suffix, -s <prefix>       - filter by suffix\n\
 --wait, -w <delay>          - Wait a specified amount of seconds\n\
 ";
 
@@ -212,6 +220,9 @@ void cleanup()
     /* Clean up */
     free(log_dir_path);
     free(command);
+    free(prefix);
+    free(suffix);
+
     closedir(log_dir);
     file_cleanup(snapshot);
     file_cleanup(changed);
@@ -267,6 +278,26 @@ int main(int argc,char** argv)
                 if (command != NULL)
                     fprintf(stderr,"Warning: --command (-c) and --list-only (-l) contradict each other\n"); 
             }
+	    else ifcmd("--prefix","-p")
+	    {
+                if (argc == i+1) 
+                {
+                    fprintf(stderr,"Too few arguments given\n");
+                    break;
+                }
+                prefix = malloc(strlen(argv[i+1])+1);
+                strcpy(prefix,argv[++i]);
+            }
+	    else ifcmd("--suffix","-s")
+	    {
+                if (argc == i+1) 
+                {
+                    fprintf(stderr,"Too few arguments given\n");
+                    break;
+                }
+                suffix = malloc(strlen(argv[i+1])+1);
+                strcpy(suffix,argv[++i]);
+            }
             else ifcmd("--wait","-w")
             {
                 char* end = NULL;
@@ -321,6 +352,16 @@ int main(int argc,char** argv)
     {
         if (strncmp(ent->d_name,".",1) == 0) continue; /* Ignore hidden files, . and .. */
         if (!is_file(log_dir_path,ent->d_name)) continue; /* Ignore directories, devices etc. */
+	if (prefix)
+	{
+	    if (strlen(prefix) > strlen(ent->d_name)) continue;
+	    if (strncmp(ent->d_name,prefix,strlen(prefix)) != 0) continue;
+	}
+	if (suffix)
+	{
+	    if (strlen(suffix) > strlen(ent->d_name)) continue;
+	    if (strcmp(ent->d_name+strlen(ent->d_name)-strlen(suffix),suffix) != 0) continue;
+	}
         file_add(&snapshot,ent->d_name,file_size(ent->d_name)); /* Append file to snapshot */
     }
 
@@ -338,6 +379,16 @@ int main(int argc,char** argv)
     {
         if (strncmp(ent->d_name,".",1) == 0) continue; /* Ignore hidden files, . and .. */
         if (!is_file(log_dir_path,ent->d_name)) continue; /* Ignore directories, devices etc. */
+	if (prefix)
+	{
+	    if (strlen(prefix) > strlen(ent->d_name)) continue;
+	    if (strncmp(ent->d_name,prefix,strlen(prefix)) != 0) continue;
+	}
+	if (suffix)
+	{
+	    if (strlen(suffix) > strlen(ent->d_name)) continue;
+	    if (strcmp(ent->d_name+strlen(ent->d_name)-strlen(suffix),suffix) != 0) continue;
+	}
         if (file_match(snapshot,ent->d_name,file_size(ent->d_name)) != MATCH_ALL)
         {
             file_add(&changed,ent->d_name,file_size(ent->d_name)); /* Append file to changed */
